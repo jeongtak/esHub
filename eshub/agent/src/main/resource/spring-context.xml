@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <import resource="classpath:camel-context.xml"/>
+    <import resource="classpath:database-config.xml"/>
+
+    <bean id="requestBroker" class="com.ktnet.ets.hub.client.request.RequestBroker"/>
+    <bean id="remoteProcessor" class="com.ktnet.ets.hub.client.listener.RemoteProcessor"/>
+
+</beans>

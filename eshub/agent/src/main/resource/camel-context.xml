@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<s:beans
+        xmlns="http://camel.apache.org/schema/spring"
+        xmlns:s="http://www.springframework.org/schema/beans"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="
+       http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
+
+    <!--http://camel.apache.org/enterprise-integration-patterns.html-->
+    <!--http://camel.apache.org/spring.html-->
+    <!--http://camel.apache.org/data-format.html-->
+
+    <s:bean class="org.jboss.netty.handler.codec.string.StringDecoder" id="stringDecoder"/>
+    <s:bean class="org.jboss.netty.handler.codec.string.StringEncoder" id="stringEncoder"/>
+
+    <camelContext id="camel">
+
+        <propertyPlaceholder id="placeholder" location="classpath:sql.properties,classpath:app.properties"/>
+
+        <!--http://camel.apache.org/timer.html-->
+        <route>
+            <from uri="timer:requestPolling?period={{db.polling.period}}"/>
+            <to uri="sql:{{sql.selectEmp}}"/>
+            <to uri="seda:requestQueue"/>
+        </route>
+
+        <!--http://camel.apache.org/file2.html-->
+        <route>
+            <from uri="file://c://stampbox?antInclude=**/*.txt&amp;move=.done"/>
+            <convertBodyTo type="java.lang.String"/>
+            <to uri="seda:requestQueue"/>
+        </route>
+
+        <!--http://camel.apache.org/seda.html-->
+        <route>
+            <from uri="seda:requestQueue?concurrentConsumers=5"/>
+            <to uri="bean:requestBroker?method=broke"/>
+        </route>
+
+        <!--http://stackoverflow.com/questions/15124571/camel-netty-udp-listener-listening-on-0-0-0-0-and-not-receiving-packets-->
+        <route>
+            <from uri="netty:tcp://{{listener.ip}}:{{listener.port}}?decoder=#stringDecoder&amp;encoder=#stringEncoder"/>
+            <log message="client message > ${body}"/>
+            <to uri="bean:remoteProcessor?method=process"/>
+            <!--<process ref="remoteProcessor"/>-->
+        </route>
+
+    </camelContext>
+
+</s:beans>
