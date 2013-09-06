@@ -16,8 +16,10 @@ import org.slf4j.LoggerFactory;
  */
 public class EmbeddedActiveMQ {
 
-	protected static Logger logger = LoggerFactory.getLogger(Main.class);
+	protected static Logger logger = LoggerFactory.getLogger(EmbeddedActiveMQ.class);
 	private int port;
+	
+	private BrokerService broker = new BrokerService();
 	
 	public EmbeddedActiveMQ(int port) {
 		this.port = port;
@@ -25,7 +27,7 @@ public class EmbeddedActiveMQ {
 
 	public void start() throws Exception {
 
-		BrokerService broker = new BrokerService();
+		
 		broker.setBrokerName("eshub-broker");
 		broker.setUseShutdownHook(false);
 
@@ -38,5 +40,9 @@ public class EmbeddedActiveMQ {
 		logger.info("MQ Start with "+mqUri.toString());
 		broker.addConnector(mqUri);
 		broker.start();
+	}
+	
+	public BrokerService getInstance(){
+		return broker;
 	}
 }

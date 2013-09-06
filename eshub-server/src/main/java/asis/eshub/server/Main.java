@@ -2,13 +2,12 @@ package asis.eshub.server;
 
 import java.io.File;
 import java.io.FileReader;
-import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.AbstractMap.SimpleEntry;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
-import org.apache.catalina.LifecycleException;
-import org.apache.catalina.startup.Tomcat;
-import org.apache.tomcat.util.http.fileupload.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,6 +16,7 @@ public class Main {
 	protected static Logger logger = LoggerFactory.getLogger(Main.class);
 
 	public static File configHomeFile = null;
+	public static List<SimpleEntry<String,Object>> SERVER_LIST = new ArrayList<SimpleEntry<String,Object>>();
 
 	static {
 		try {
@@ -30,10 +30,11 @@ public class Main {
 	public static String CONFIG_HOME = configHomeFile.getAbsolutePath() + File.separator;
 	public static String ESHUB_HOME = configHomeFile.getParentFile() + File.separator;
 	public static String APP_HOME = ESHUB_HOME + "webapp" + File.separator;
-
-	private static Tomcat tomcat = new Tomcat();
+	
+	private static EmbeddedTomcat tomcat;
 	private static EmbeddedActiveMQ activeMq;
 	private static EmbeddedFtpServer ftpServer;
+	private static EmbeddedScheduler scheduler;
 
 	public static void main(String[] args) throws Exception {
 
@@ -68,6 +69,12 @@ public class Main {
 			webPort = "8080";
 			logger.info("주의! esHub Http Sever 포트를 default:8080로 설정합니다");
 		}
+		
+		boolean isAutoDeploy = "true".equals(props.getProperty("http.autodeploy")) ? true : false;
+		
+		tomcat = new EmbeddedTomcat(Integer.valueOf(webPort));
+		tomcat.setAutoDeploy(isAutoDeploy);
+		SERVER_LIST.add(new SimpleEntry<String, Object>("tomcat", tomcat));
 
 		if (mqPort == null || mqPort.isEmpty()) {
 			mqPort = "8888";
@@ -75,6 +82,7 @@ public class Main {
 		}
 
 		activeMq = new EmbeddedActiveMQ(Integer.valueOf(mqPort));
+		SERVER_LIST.add(new SimpleEntry<String, Object>("activeMQ", activeMq));
 
 		if (ftpPort == null || ftpPort.isEmpty()) {
 			ftpPort = "9999";
@@ -87,59 +95,20 @@ public class Main {
 		}
 
 		ftpServer = new EmbeddedFtpServer(Integer.valueOf(ftpPort));
+		SERVER_LIST.add(new SimpleEntry<String, Object>("ftpServer", ftpServer));
 
-		boolean isAutoDeploy = "true".equals(props.getProperty("http.autodeploy")) ? true : false;
-
-		tomcat.setPort(Integer.valueOf(webPort));
-		tomcat.getHost().setAutoDeploy(isAutoDeploy);
-		tomcat.getHost().setDeployOnStartup(true);
-
-		File webAppRoot = new File(APP_HOME);
-
-		if (webAppRoot.exists()) {
-			File[] files = webAppRoot.listFiles();
-			for (File webapp : files) {
-				tomcat.addWebapp("/" + webapp.getName(), webapp.getAbsolutePath());
-				logger.info(">> 어플리케이션 로딩:" + webapp.getName());
-			}
-		} else {
-			logger.info("주의! WebApp가 하나도 없습니다");
-		}
-
-		// tomcat.setSilent(true);
+		scheduler = new EmbeddedScheduler();
+		SERVER_LIST.add(new SimpleEntry<String, Object>("scheduler", scheduler));
+		
 		tomcat.start();
 		activeMq.start();
 		ftpServer.start();
-
-		tomcat.getServer().await();
+		scheduler.start();
+		
+		tomcat.await();
 
 	}
 
-	public static void stop(String port) throws LifecycleException, IOException {
-		tomcat.stop();
-		tomcat.destroy();
-		// Tomcat creates a work folder where the temporary files are stored
-		FileUtils.deleteDirectory(new File("work"));
-		FileUtils.deleteDirectory(new File("tomcat." + port));
-	}
 
-	// public void deploy(String appName) throws MalformedURLException,
-	// ServletException, LifecycleException {
-	// // You _must_ get Catalina context file and call setConfigFile with the
-	// // URI
-	// // identifying your context.xml file
-	// Context ctx = tomcat.addWebapp("/GlossaryService", "build/web");
-	// File configFile = new File("build/web/META-INF/context.xml");
-	// ctx.setConfigFile(configFile.toURI().toURL());
-	// // Tomcat can only be started _after_ the setConfigFile is called
-	// tomcat.start();
-	// }
 
-	public String getApplicationUrl(String appName) {
-		return String.format("http://%s:%d/%s", tomcat.getHost().getName(), tomcat.getConnector().getLocalPort(), appName);
-	}
-
-	public boolean isRunning() {
-		return tomcat != null;
-	}
 }
